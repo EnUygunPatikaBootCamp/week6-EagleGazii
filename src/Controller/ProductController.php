@@ -3,7 +3,6 @@
 namespace App\Controller;
 
 use App\Entity\Product;
-use DateTimeZone;
 use Doctrine\Persistence\ManagerRegistry;
 use Exception;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -22,6 +21,19 @@ class ProductController extends AbstractController
         return $messages;
     }
 
+    private function getErrors($message){
+        return new JsonResponse([
+            'status'=>'fail',
+            'message'=>$message
+        ],404,['Content-Type' => 'application/json']);
+    }
+    private function getFoundedProduct($data){
+        return new JsonResponse([
+            'status'=>'success',
+            'data'=>$data
+        ],200,['Content-Type' => 'application/json']);
+    }
+
 
     #[Route('/product',name:'create_product' ,methods: ['POST'])]
     public function create(Request $request,ValidatorInterface $validator, ManagerRegistry  $doctrine): JsonResponse
@@ -36,11 +48,8 @@ class ProductController extends AbstractController
         $product->setPrice($data['price']);
         $product->setStock($data['stock']);
         $product->setCreatedAt(new \DateTimeImmutable());
-        $entityManager->persist($product);
 
         $errors = $validator->validate($product);
-
-
 
         if(count($errors) > 0){
             return new JsonResponse([
@@ -49,21 +58,15 @@ class ProductController extends AbstractController
             ]);
         }
 
-
+        $entityManager->persist($product);
 
         try {
             $entityManager->flush();
         }catch (Exception $ex){
-            return new JsonResponse([
-                'status'=>'fail',
-                'exception_message'=>$ex->getMessage()
-            ]);
+            return $this->getErrors($ex->getMessage());
         }
 
-        return new JsonResponse([
-            'status' => 'Success',
-            'data'=>$data
-        ]);
+        return $this->getFoundedProduct($product);
     }
 
 
@@ -73,11 +76,69 @@ class ProductController extends AbstractController
         $entityManager = $doctrine->getRepository(Product::class);
         $products = $entityManager->findAll();
 
-        
-
-        //foreach ($products as $product)
-        return new JsonResponse(['status'=>'success','data'=>$products]);
+        if(!$products){
+            return $this->getErrors('Products not founded');
+        }
+        return $this->getFoundedProduct($products);
     }
 
+
+    #[Route('/product/{id}',name:'show_product_by_id' ,methods: ['GET'])]
+    public function showProductById(int $id, ManagerRegistry $doctrine){
+        $entityManager = $doctrine->getRepository(Product::class);
+        $product = $entityManager->find($id);
+
+        if(!$product){
+            return $this->getErrors('Product with that specific id not founded');
+        }
+        return $this->getFoundedProduct($product);
+    }
+
+    #[Route('/product/{id}',name:'show_product_by_id' ,methods: ['PUT'])]
+    public function update(int $id, Request $request, ManagerRegistry $doctrine):JsonResponse{
+
+        $data = json_decode($request->getContent(),true);
+        $entityManager = $doctrine->getManager();
+
+
+        $product = $entityManager->getRepository(Product::class)->find($id);
+        if(!$product){
+            return $this->getErrors('Product not founded');
+        }
+
+        isset($data['name']) && $product->setName($data['name']);
+        isset($data['price']) && $product->setPrice($data['price']);
+        isset($data['stock']) && $product->setStock($data['stock']);
+        isset($data['description']) && $product->setDescription($data['description']);
+        $product->setUpdatedAt(new \DateTimeImmutable());
+
+
+        try {
+            $entityManager->flush();
+        }catch (Exception $ex){
+            return $this->getErrors($ex->getMessage());
+        }
+        return $this->getFoundedProduct($product);
+    }
+
+    #[Route('/product/{id}',name:'show_product_by_id' ,methods: ['Delete'])]
+    public function delete(int $id, ManagerRegistry $doctrine):JsonResponse
+    {
+        $entityManager = $doctrine->getManager();
+        $product = $entityManager->getRepository(Product::class)->find($id);
+
+        if(!$product){
+            return $this->getErrors('Product not founded');
+        }
+
+        $entityManager->remove($product);
+        try {
+            $entityManager->flush();
+        }catch (Exception $ex){
+            return $this->getErrors($ex->getMessage());
+        }
+
+        return new JsonResponse(['status'=>'success'],200,['Content-type'=>'application/json']);
+    }
 
 }

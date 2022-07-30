@@ -5,10 +5,11 @@ namespace App\Entity;
 use App\Repository\ProductRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use JsonSerializable;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: ProductRepository::class)]
-class Product
+class Product implements JsonSerializable
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -53,7 +54,18 @@ class Product
     private ?\DateTimeInterface $updated_at = null;
 
 
-
+    public function jsonSerialize()
+    {
+        return array(
+            'id'=>$this->getId(),
+            'name' => $this->getName(),
+            'description'=> $this->getDescription(),
+            'price'=> $this->getPrice(),
+            'stock'=> $this->getStock(),
+            'createdAt'=>$this->getCreatedAt(),
+            'updatedAt'=>$this->getUpdatedAt()
+        );
+    }
 
 
     public function getId(): ?int
